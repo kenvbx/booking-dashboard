@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AppointmentResource;
+use App\Jobs\SendAppointmentConfirmation;
+use App\Jobs\SendAppointmentReminder;
 use App\Models\Appointment;
 use App\Models\StaffProfile;
 use Carbon\Carbon;
@@ -58,6 +60,16 @@ class AppointmentController extends Controller
 
             return $appointment;
         });
+
+        if ($appointment->status !== AppointmentStatus::Cancelled->value) {
+            SendAppointmentConfirmation::dispatch($appointment->id)->afterCommit();
+
+            if ($appointment->starts_at->isFuture()) {
+                SendAppointmentReminder::dispatch($appointment->id)
+                    ->delay($appointment->starts_at->copy()->subHour())
+                    ->afterCommit();
+            }
+        }
 
         return new AppointmentResource($appointment->load(['customer', 'service', 'staff']));
     }

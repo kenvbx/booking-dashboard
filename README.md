@@ -45,6 +45,7 @@ The first backend slice is available in `backend/`:
 - Demo factories and seed data.
 - Transactional appointment creation with server-side overlap validation.
 - Sanctum token authentication with `admin` and `staff` role middleware.
+- Queue-based confirmation and one-hour reminder email jobs with retry backoff.
 - PHPUnit feature coverage for appointment creation, conflicts, and customer validation.
 
 Run the backend locally:

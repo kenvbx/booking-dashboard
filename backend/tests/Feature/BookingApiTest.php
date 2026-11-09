@@ -2,12 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendAppointmentConfirmation;
+use App\Jobs\SendAppointmentReminder;
+use App\Mail\AppointmentConfirmationMail;
 use App\Models\Appointment;
 use App\Models\Customer;
 use App\Models\Service;
 use App\Models\StaffProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class BookingApiTest extends TestCase
@@ -143,5 +148,36 @@ class BookingApiTest extends TestCase
             ->assertNoContent();
 
         $this->assertDatabaseHas('appointments', ['id' => $appointment->id, 'status' => 'cancelled']);
+    }
+
+    public function test_future_appointment_queues_confirmation_and_reminder(): void
+    {
+        Queue::fake();
+        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
+        $customer = Customer::factory()->create();
+        $staff = StaffProfile::factory()->create();
+
+        $this->postJson('/api/appointments', [
+            'customer_id' => $customer->id,
+            'staff_profile_id' => $staff->id,
+            'title' => 'Queued appointment',
+            'starts_at' => '2026-11-18T09:00:00+07:00',
+            'ends_at' => '2026-11-18T09:45:00+07:00',
+        ])->assertCreated();
+
+        Queue::assertPushed(SendAppointmentConfirmation::class);
+        Queue::assertPushed(SendAppointmentReminder::class);
+    }
+
+    public function test_confirmation_job_sends_to_the_customer_email(): void
+    {
+        Mail::fake();
+        $appointment = Appointment::factory()->create();
+
+        (new SendAppointmentConfirmation($appointment->id))->handle();
+
+        Mail::assertSent(AppointmentConfirmationMail::class, function (AppointmentConfirmationMail $mail) use ($appointment): bool {
+            return $mail->hasTo($appointment->customer->email);
+        });
     }
 }

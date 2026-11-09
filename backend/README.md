@@ -39,6 +39,14 @@ Appointment creation validates required relationships, time ordering, timezone, 
 
 Appointment status transitions are server-validated: `pending → confirmed/cancelled`, `confirmed → completed/cancelled/rescheduled`, and `rescheduled → pending/confirmed/cancelled`. Cancellation and rescheduling require a reason, and terminal status changes are written to the status history table.
 
+Creating a future appointment queues a confirmation email immediately and a reminder one hour before the start time. Jobs use three attempts with 1/5/15 minute backoff. Run the worker locally with:
+
+```bash
+php artisan queue:work --tries=3 --backoff=60,300,900
+```
+
+The default local mailer writes messages to `storage/logs/laravel.log`; configure SMTP in `.env` when an actual mail transport is needed.
+
 ## Verification
 
 ```bash
