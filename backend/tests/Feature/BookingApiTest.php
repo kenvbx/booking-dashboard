@@ -108,4 +108,40 @@ class BookingApiTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('status');
     }
+
+    public function test_admin_can_edit_resources_and_deactivate_staff(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']), 'sanctum');
+        $customer = Customer::factory()->create(['name' => 'Old name']);
+        $service = Service::factory()->create(['name' => 'Old service']);
+        $staff = StaffProfile::factory()->create(['display_name' => 'Old staff']);
+
+        $this->patchJson('/api/customers/'.$customer->id, ['name' => 'Updated customer'])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Updated customer');
+        $this->patchJson('/api/services/'.$service->id, ['name' => 'Updated service', 'duration_minutes' => 60])
+            ->assertOk()
+            ->assertJsonPath('data.duration_minutes', 60);
+        $this->patchJson('/api/staff/'.$staff->id, ['display_name' => 'Updated staff'])
+            ->assertOk()
+            ->assertJsonPath('data.display_name', 'Updated staff');
+        $this->deleteJson('/api/staff/'.$staff->id)
+            ->assertNoContent();
+
+        $this->assertDatabaseHas('staff_profiles', ['id' => $staff->id, 'is_active' => false]);
+    }
+
+    public function test_staff_can_edit_and_cancel_an_appointment(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
+        $appointment = Appointment::factory()->create(['status' => 'confirmed']);
+
+        $this->patchJson('/api/appointments/'.$appointment->id, ['title' => 'Rescheduled title'])
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Rescheduled title');
+        $this->deleteJson('/api/appointments/'.$appointment->id, ['reason' => 'Customer requested cancellation'])
+            ->assertNoContent();
+
+        $this->assertDatabaseHas('appointments', ['id' => $appointment->id, 'status' => 'cancelled']);
+    }
 }

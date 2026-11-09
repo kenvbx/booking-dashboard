@@ -16,7 +16,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware('role:admin')->group(function (): void {
         Route::apiResource('customers', CustomerController::class);
         Route::apiResource('services', ServiceController::class);
-        Route::apiResource('staff', StaffController::class)->only(['index', 'store', 'show']);
+        Route::apiResource('staff', StaffController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     });
 
     Route::middleware('role:admin,staff')->group(function (): void {
