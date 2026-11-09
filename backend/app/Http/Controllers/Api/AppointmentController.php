@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\AppointmentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AppointmentResource;
 use App\Models\Appointment;
@@ -11,6 +12,7 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AppointmentController extends Controller
@@ -35,7 +37,7 @@ class AppointmentController extends Controller
         $data['timezone'] ??= config('app.timezone', 'Asia/Ho_Chi_Minh');
         $data['status'] ??= 'pending';
 
-        $appointment = $database->transaction(function () use ($data): Appointment {
+        $appointment = $database->transaction(function () use ($data, $request): Appointment {
             StaffProfile::query()->whereKey($data['staff_profile_id'])->lockForUpdate()->firstOrFail();
 
             if (! empty($data['idempotency_key'])) {
@@ -48,7 +50,11 @@ class AppointmentController extends Controller
 
             $this->ensureNoConflict($data);
             $appointment = Appointment::create($data);
-            $appointment->statusHistory()->create(['to_status' => $appointment->status]);
+            $appointment->statusHistory()->create([
+                'to_status' => $appointment->status,
+                'changed_by' => $request->user()?->id,
+                'reason' => $data['status_reason'] ?? null,
+            ]);
 
             return $appointment;
         });
@@ -64,25 +70,39 @@ class AppointmentController extends Controller
     public function update(Request $request, Appointment $appointment, DatabaseManager $database): AppointmentResource
     {
         $data = $request->validate($this->rules(true));
-        $database->transaction(function () use ($appointment, $data): void {
+        $database->transaction(function () use ($appointment, $data, $request): void {
             if (isset($data['starts_at']) || isset($data['ends_at']) || isset($data['staff_profile_id'])) {
                 $booking = array_merge($appointment->only(['staff_profile_id', 'starts_at', 'ends_at']), $data);
                 StaffProfile::query()->whereKey($booking['staff_profile_id'])->lockForUpdate()->firstOrFail();
                 $this->ensureNoConflict($booking, $appointment->id);
             }
             $oldStatus = $appointment->status;
+            $this->validateStatusTransition($oldStatus, $data['status'] ?? null, $data['status_reason'] ?? null);
             $appointment->update($data);
             if (isset($data['status']) && $oldStatus !== $data['status']) {
-                $appointment->statusHistory()->create(['from_status' => $oldStatus, 'to_status' => $data['status']]);
+                $appointment->statusHistory()->create([
+                    'from_status' => $oldStatus,
+                    'to_status' => $data['status'],
+                    'changed_by' => $request->user()?->id,
+                    'reason' => $data['status_reason'] ?? null,
+                ]);
             }
         });
 
         return new AppointmentResource($appointment->refresh()->load(['customer', 'service', 'staff']));
     }
 
-    public function destroy(Appointment $appointment): Response
+    public function destroy(Request $request, Appointment $appointment): Response
     {
-        $appointment->update(['status' => 'cancelled']);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+        $this->validateStatusTransition($appointment->status, AppointmentStatus::Cancelled->value, $data['reason']);
+        $appointment->update(['status' => AppointmentStatus::Cancelled->value]);
+        $appointment->statusHistory()->create([
+            'from_status' => $appointment->getOriginal('status'),
+            'to_status' => AppointmentStatus::Cancelled->value,
+            'changed_by' => $request->user()?->id,
+            'reason' => $data['reason'],
+        ]);
 
         return response()->noContent();
     }
@@ -98,11 +118,30 @@ class AppointmentController extends Controller
             'title' => [$required, 'string', 'max:180'],
             'starts_at' => [$required, 'date'],
             'ends_at' => [$required, 'date', 'after:starts_at'],
-            'status' => ['sometimes', 'in:pending,confirmed,cancelled,completed,rescheduled'],
+            'status' => ['sometimes', Rule::in(AppointmentStatus::values())],
+            'status_reason' => ['nullable', 'string', 'max:255'],
             'timezone' => ['sometimes', 'timezone'],
             'idempotency_key' => ['nullable', 'string', 'max:120'],
             'notes' => ['nullable', 'string'],
         ];
+    }
+
+    private function validateStatusTransition(string $currentStatus, ?string $nextStatus, ?string $reason): void
+    {
+        if ($nextStatus === null || $currentStatus === $nextStatus) {
+            return;
+        }
+
+        $current = AppointmentStatus::from($currentStatus);
+        $next = AppointmentStatus::from($nextStatus);
+
+        if (! $current->canTransitionTo($next)) {
+            throw ValidationException::withMessages(['status' => "Cannot change appointment status from {$current->value} to {$next->value}."]);
+        }
+
+        if (in_array($next, [AppointmentStatus::Cancelled, AppointmentStatus::Rescheduled], true) && blank($reason)) {
+            throw ValidationException::withMessages(['status_reason' => 'A reason is required for cancellation or rescheduling.']);
+        }
     }
 
     private function ensureNoConflict(array $data, ?int $ignoreId = null): void

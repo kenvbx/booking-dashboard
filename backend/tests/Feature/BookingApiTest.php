@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Appointment;
 use App\Models\Customer;
 use App\Models\Service;
 use App\Models\StaffProfile;
@@ -81,5 +82,30 @@ class BookingApiTest extends TestCase
 
         $this->assertSame($first->json('data.id'), $second->json('data.id'));
         $this->assertDatabaseCount('appointments', 1);
+    }
+
+    public function test_status_transitions_are_validated_and_recorded(): void
+    {
+        $this->actingAs($actor = User::factory()->create(['role' => 'staff']), 'sanctum');
+        $appointment = Appointment::factory()->create(['status' => 'pending']);
+
+        $this->patchJson('/api/appointments/'.$appointment->id, ['status' => 'confirmed'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'confirmed');
+        $this->assertDatabaseHas('appointment_status_histories', [
+            'appointment_id' => $appointment->id,
+            'from_status' => 'pending',
+            'to_status' => 'confirmed',
+            'changed_by' => $actor->id,
+        ]);
+
+        $this->patchJson('/api/appointments/'.$appointment->id, ['status' => 'cancelled'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status_reason');
+        $this->patchJson('/api/appointments/'.$appointment->id, ['status' => 'cancelled', 'status_reason' => 'Customer requested cancellation'])
+            ->assertOk();
+        $this->patchJson('/api/appointments/'.$appointment->id, ['status' => 'confirmed'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
     }
 }

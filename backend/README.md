@@ -37,6 +37,8 @@ Admin-only resources are customers, services, and staff. Admin and staff can acc
 
 Appointment creation validates required relationships, time ordering, timezone, and overlapping bookings for the same staff member inside a database transaction.
 
+Appointment status transitions are server-validated: `pending → confirmed/cancelled`, `confirmed → completed/cancelled/rescheduled`, and `rescheduled → pending/confirmed/cancelled`. Cancellation and rescheduling require a reason, and terminal status changes are written to the status history table.
+
 ## Verification
 
 ```bash
