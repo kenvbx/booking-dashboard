@@ -8,6 +8,7 @@ use App\Http\Resources\AppointmentResource;
 use App\Jobs\SendAppointmentConfirmation;
 use App\Jobs\SendAppointmentReminder;
 use App\Models\Appointment;
+use App\Models\AuditLog;
 use App\Models\StaffProfile;
 use Carbon\Carbon;
 use Illuminate\Database\DatabaseManager;
@@ -57,6 +58,7 @@ class AppointmentController extends Controller
                 'changed_by' => $request->user()?->id,
                 'reason' => $data['status_reason'] ?? null,
             ]);
+            AuditLog::record('appointment.created', $appointment, ['status' => $appointment->status]);
 
             return $appointment;
         });
@@ -99,6 +101,7 @@ class AppointmentController extends Controller
                     'reason' => $data['status_reason'] ?? null,
                 ]);
             }
+            AuditLog::record('appointment.updated', $appointment, ['changed_fields' => array_keys($appointment->getChanges())]);
         });
 
         return new AppointmentResource($appointment->refresh()->load(['customer', 'service', 'staff']));
@@ -115,6 +118,7 @@ class AppointmentController extends Controller
             'changed_by' => $request->user()?->id,
             'reason' => $data['reason'],
         ]);
+        AuditLog::record('appointment.cancelled', $appointment, ['reason' => $data['reason']]);
 
         return response()->noContent();
     }

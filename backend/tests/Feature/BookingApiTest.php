@@ -180,4 +180,24 @@ class BookingApiTest extends TestCase
             return $mail->hasTo($appointment->customer->email);
         });
     }
+
+    public function test_important_appointment_actions_create_audit_logs(): void
+    {
+        $this->actingAs($actor = User::factory()->create(['role' => 'staff']), 'sanctum');
+        $appointment = Appointment::factory()->create(['status' => 'confirmed']);
+
+        $this->patchJson('/api/appointments/'.$appointment->id, ['title' => 'Updated title'])->assertOk();
+        $this->deleteJson('/api/appointments/'.$appointment->id, ['reason' => 'Customer requested cancellation'])->assertNoContent();
+
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $actor->id,
+            'action' => 'appointment.updated',
+            'auditable_id' => $appointment->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $actor->id,
+            'action' => 'appointment.cancelled',
+            'auditable_id' => $appointment->id,
+        ]);
+    }
 }

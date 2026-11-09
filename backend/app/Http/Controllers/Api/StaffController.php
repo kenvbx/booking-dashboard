@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\StaffResource;
+use App\Models\AuditLog;
 use App\Models\StaffProfile;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -25,6 +26,7 @@ class StaffController extends Controller
             'color' => ['nullable', 'string', 'max:32'],
             'is_active' => ['sometimes', 'boolean'],
         ]));
+        AuditLog::record('staff.created', $staff);
 
         return new StaffResource($staff);
     }
@@ -43,6 +45,7 @@ class StaffController extends Controller
             'color' => ['nullable', 'string', 'max:32'],
             'is_active' => ['sometimes', 'boolean'],
         ]));
+        AuditLog::record('staff.updated', $staff, ['changed_fields' => array_keys($staff->getChanges())]);
 
         return new StaffResource($staff->refresh());
     }
@@ -50,6 +53,7 @@ class StaffController extends Controller
     public function destroy(StaffProfile $staff): Response
     {
         $staff->update(['is_active' => false]);
+        AuditLog::record('staff.deactivated', $staff);
 
         return response()->noContent();
     }

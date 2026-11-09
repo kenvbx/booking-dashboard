@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CustomerResource;
+use App\Models\AuditLog;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -29,6 +30,7 @@ class CustomerController extends Controller
             'phone' => ['nullable', 'string', 'max:32'],
             'notes' => ['nullable', 'string'],
         ]));
+        AuditLog::record('customer.created', $customer);
 
         return new CustomerResource($customer);
     }
@@ -46,6 +48,7 @@ class CustomerController extends Controller
             'phone' => ['nullable', 'string', 'max:32'],
             'notes' => ['nullable', 'string'],
         ]));
+        AuditLog::record('customer.updated', $customer, ['changed_fields' => array_keys($customer->getChanges())]);
 
         return new CustomerResource($customer->refresh());
     }
@@ -53,6 +56,7 @@ class CustomerController extends Controller
     public function destroy(Customer $customer): Response
     {
         $customer->delete();
+        AuditLog::record('customer.deleted', $customer);
 
         return response()->noContent();
     }

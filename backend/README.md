@@ -37,6 +37,8 @@ Admin-only resources are customers, services, and staff. Admin and staff can acc
 
 Appointment creation validates required relationships, time ordering, timezone, and overlapping bookings for the same staff member inside a database transaction.
 
+Important create, update, deactivate, and cancel actions write an audit record with the actor, resource, action, and minimal metadata in `audit_logs`.
+
 Appointment status transitions are server-validated: `pending → confirmed/cancelled`, `confirmed → completed/cancelled/rescheduled`, and `rescheduled → pending/confirmed/cancelled`. Cancellation and rescheduling require a reason, and terminal status changes are written to the status history table.
 
 Creating a future appointment queues a confirmation email immediately and a reminder one hour before the start time. Jobs use three attempts with 1/5/15 minute backoff. Run the worker locally with:

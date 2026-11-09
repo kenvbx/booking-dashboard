@@ -16,6 +16,17 @@ class AuditLog extends Model
 {
     use HasFactory;
 
+    public static function record(string $action, Model $auditable, array $metadata = []): self
+    {
+        return static::create([
+            'user_id' => auth()->id(),
+            'action' => $action,
+            'auditable_type' => $auditable->getMorphClass(),
+            'auditable_id' => $auditable->getKey(),
+            'metadata' => $metadata,
+        ]);
+    }
+
     protected function casts(): array
     {
         return ['metadata' => 'array'];

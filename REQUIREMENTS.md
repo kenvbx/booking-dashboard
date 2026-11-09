@@ -10,6 +10,7 @@
 | R4 | Admin/Staff | Tạo appointment | Form yêu cầu title, customer, staff, start time; save thành công hiển thị toast. |
 | R5 | System | Chuẩn bị chống trùng | Backend slice phải validate overlap trong transaction; UI mô tả rõ việc check conflict. |
 | R6 | System | Trạng thái | Confirmed, Pending, Cancelled dùng màu semantic và legend thống nhất. |
+| R7 | Admin/Staff | Audit log | Hành động appointment quan trọng lưu actor, action, resource và metadata tối thiểu. |
 
 ## Follow-up
 - Laravel auth + Sanctum/RBAC, CRUD customer/service/staff.

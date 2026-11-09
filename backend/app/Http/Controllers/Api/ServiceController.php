@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ServiceResource;
+use App\Models\AuditLog;
 use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -25,6 +26,7 @@ class ServiceController extends Controller
             'price' => ['required', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
         ]));
+        AuditLog::record('service.created', $service);
 
         return new ServiceResource($service);
     }
@@ -43,6 +45,7 @@ class ServiceController extends Controller
             'price' => ['sometimes', 'required', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
         ]));
+        AuditLog::record('service.updated', $service, ['changed_fields' => array_keys($service->getChanges())]);
 
         return new ServiceResource($service->refresh());
     }
@@ -50,6 +53,7 @@ class ServiceController extends Controller
     public function destroy(Service $service): Response
     {
         $service->update(['is_active' => false]);
+        AuditLog::record('service.deactivated', $service);
 
         return response()->noContent();
     }
