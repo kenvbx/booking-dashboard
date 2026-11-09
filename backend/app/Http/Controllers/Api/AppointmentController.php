@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AppointmentResource;
 use App\Models\Appointment;
+use App\Models\StaffProfile;
 use Carbon\Carbon;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Http\Request;
@@ -35,6 +36,16 @@ class AppointmentController extends Controller
         $data['status'] ??= 'pending';
 
         $appointment = $database->transaction(function () use ($data): Appointment {
+            StaffProfile::query()->whereKey($data['staff_profile_id'])->lockForUpdate()->firstOrFail();
+
+            if (! empty($data['idempotency_key'])) {
+                $existing = Appointment::query()->where('idempotency_key', $data['idempotency_key'])->first();
+
+                if ($existing) {
+                    return $existing;
+                }
+            }
+
             $this->ensureNoConflict($data);
             $appointment = Appointment::create($data);
             $appointment->statusHistory()->create(['to_status' => $appointment->status]);
@@ -55,7 +66,9 @@ class AppointmentController extends Controller
         $data = $request->validate($this->rules(true));
         $database->transaction(function () use ($appointment, $data): void {
             if (isset($data['starts_at']) || isset($data['ends_at']) || isset($data['staff_profile_id'])) {
-                $this->ensureNoConflict(array_merge($appointment->only(['staff_profile_id', 'starts_at', 'ends_at']), $data), $appointment->id);
+                $booking = array_merge($appointment->only(['staff_profile_id', 'starts_at', 'ends_at']), $data);
+                StaffProfile::query()->whereKey($booking['staff_profile_id'])->lockForUpdate()->firstOrFail();
+                $this->ensureNoConflict($booking, $appointment->id);
             }
             $oldStatus = $appointment->status;
             $appointment->update($data);
