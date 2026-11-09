@@ -21,10 +21,9 @@ class BookingApiTest extends TestCase
 
     public function test_appointments_can_be_created_and_listed(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
+        [$actor, $staff] = $this->signInStaff();
         $customer = Customer::factory()->create();
         $service = Service::factory()->create();
-        $staff = StaffProfile::factory()->create();
 
         $response = $this->postJson('/api/appointments', [
             'customer_id' => $customer->id,
@@ -41,9 +40,8 @@ class BookingApiTest extends TestCase
 
     public function test_overlapping_appointments_for_the_same_staff_are_rejected(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
+        [, $staff] = $this->signInStaff();
         $customer = Customer::factory()->create();
-        $staff = StaffProfile::factory()->create();
         $payload = [
             'customer_id' => $customer->id,
             'staff_profile_id' => $staff->id,
@@ -70,9 +68,8 @@ class BookingApiTest extends TestCase
 
     public function test_retrying_with_the_same_idempotency_key_returns_the_original_appointment(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
+        [, $staff] = $this->signInStaff();
         $customer = Customer::factory()->create();
-        $staff = StaffProfile::factory()->create();
         $payload = [
             'customer_id' => $customer->id,
             'staff_profile_id' => $staff->id,
@@ -91,8 +88,8 @@ class BookingApiTest extends TestCase
 
     public function test_status_transitions_are_validated_and_recorded(): void
     {
-        $this->actingAs($actor = User::factory()->create(['role' => 'staff']), 'sanctum');
-        $appointment = Appointment::factory()->create(['status' => 'pending']);
+        [$actor, $staff] = $this->signInStaff();
+        $appointment = Appointment::factory()->create(['status' => 'pending', 'staff_profile_id' => $staff->id]);
 
         $this->patchJson('/api/appointments/'.$appointment->id, ['status' => 'confirmed'])
             ->assertOk()
@@ -138,8 +135,8 @@ class BookingApiTest extends TestCase
 
     public function test_staff_can_edit_and_cancel_an_appointment(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
-        $appointment = Appointment::factory()->create(['status' => 'confirmed']);
+        [, $staff] = $this->signInStaff();
+        $appointment = Appointment::factory()->create(['status' => 'confirmed', 'staff_profile_id' => $staff->id]);
 
         $this->patchJson('/api/appointments/'.$appointment->id, ['title' => 'Rescheduled title'])
             ->assertOk()
@@ -150,12 +147,20 @@ class BookingApiTest extends TestCase
         $this->assertDatabaseHas('appointments', ['id' => $appointment->id, 'status' => 'cancelled']);
     }
 
+    public function test_staff_cannot_view_another_staff_members_appointment(): void
+    {
+        $this->signInStaff();
+        $otherStaff = StaffProfile::factory()->create();
+        $appointment = Appointment::factory()->create(['staff_profile_id' => $otherStaff->id]);
+
+        $this->getJson('/api/appointments/'.$appointment->id)->assertForbidden();
+    }
+
     public function test_future_appointment_queues_confirmation_and_reminder(): void
     {
         Queue::fake();
-        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
+        [, $staff] = $this->signInStaff();
         $customer = Customer::factory()->create();
-        $staff = StaffProfile::factory()->create();
 
         $this->postJson('/api/appointments', [
             'customer_id' => $customer->id,
@@ -183,8 +188,8 @@ class BookingApiTest extends TestCase
 
     public function test_important_appointment_actions_create_audit_logs(): void
     {
-        $this->actingAs($actor = User::factory()->create(['role' => 'staff']), 'sanctum');
-        $appointment = Appointment::factory()->create(['status' => 'confirmed']);
+        [$actor, $staff] = $this->signInStaff();
+        $appointment = Appointment::factory()->create(['status' => 'confirmed', 'staff_profile_id' => $staff->id]);
 
         $this->patchJson('/api/appointments/'.$appointment->id, ['title' => 'Updated title'])->assertOk();
         $this->deleteJson('/api/appointments/'.$appointment->id, ['reason' => 'Customer requested cancellation'])->assertNoContent();
@@ -203,8 +208,8 @@ class BookingApiTest extends TestCase
 
     public function test_staff_can_read_dashboard_metrics(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
-        Appointment::factory()->create(['status' => 'completed']);
+        [, $staff] = $this->signInStaff();
+        Appointment::factory()->create(['status' => 'completed', 'staff_profile_id' => $staff->id]);
         Customer::factory()->create();
 
         $this->getJson('/api/dashboard/metrics')
@@ -212,5 +217,15 @@ class BookingApiTest extends TestCase
             ->assertJsonStructure(['data' => ['total_bookings', 'upcoming_today', 'completion_rate', 'new_customers', 'timezone', 'generated_at']])
             ->assertJsonPath('data.total_bookings', 1)
             ->assertJsonPath('data.completion_rate', 100);
+    }
+
+    /** @return array{0: User, 1: StaffProfile} */
+    private function signInStaff(): array
+    {
+        $user = User::factory()->create(['role' => 'staff']);
+        $staff = StaffProfile::factory()->create(['user_id' => $user->id]);
+        $this->actingAs($user, 'sanctum');
+
+        return [$user, $staff];
     }
 }

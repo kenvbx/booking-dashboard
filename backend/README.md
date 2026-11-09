@@ -36,6 +36,8 @@ Authentication endpoints:
 
 Admin-only resources are customers, services, and staff. Admin and staff can access appointments. Protected routes require a Sanctum bearer token.
 
+Security defaults include a five-attempt-per-minute login limiter, a 120-request-per-minute API limiter, explicit frontend CORS origin configuration through `FRONTEND_URL`, and appointment policies that scope staff access to their assigned staff profile.
+
 Appointment creation validates required relationships, time ordering, timezone, and overlapping bookings for the same staff member inside a database transaction.
 
 Important create, update, deactivate, and cancel actions write an audit record with the actor, resource, action, and minimal metadata in `audit_logs`.

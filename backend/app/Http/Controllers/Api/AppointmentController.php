@@ -15,6 +15,7 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -22,7 +23,14 @@ class AppointmentController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $appointments = Appointment::query()
+        Gate::authorize('viewAny', Appointment::class);
+        $query = Appointment::query();
+
+        if ($request->user()->role === 'staff') {
+            $query->where('staff_profile_id', $request->user()->staffProfile?->id ?? 0);
+        }
+
+        $appointments = $query
             ->with(['customer', 'service', 'staff'])
             ->when($request->filled('staff_profile_id'), fn ($query) => $query->where('staff_profile_id', $request->integer('staff_profile_id')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
@@ -39,6 +47,7 @@ class AppointmentController extends Controller
         $data = $request->validate($this->rules());
         $data['timezone'] ??= config('app.timezone', 'Asia/Ho_Chi_Minh');
         $data['status'] ??= 'pending';
+        Gate::authorize('create', new Appointment($data));
 
         $appointment = $database->transaction(function () use ($data, $request): Appointment {
             StaffProfile::query()->whereKey($data['staff_profile_id'])->lockForUpdate()->firstOrFail();
@@ -78,11 +87,14 @@ class AppointmentController extends Controller
 
     public function show(Appointment $appointment): AppointmentResource
     {
+        Gate::authorize('view', $appointment);
+
         return new AppointmentResource($appointment->load(['customer', 'service', 'staff', 'statusHistory']));
     }
 
     public function update(Request $request, Appointment $appointment, DatabaseManager $database): AppointmentResource
     {
+        Gate::authorize('update', $appointment);
         $data = $request->validate($this->rules(true));
         $database->transaction(function () use ($appointment, $data, $request): void {
             if (isset($data['starts_at']) || isset($data['ends_at']) || isset($data['staff_profile_id'])) {
@@ -109,6 +121,7 @@ class AppointmentController extends Controller
 
     public function destroy(Request $request, Appointment $appointment): Response
     {
+        Gate::authorize('delete', $appointment);
         $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
         $this->validateStatusTransition($appointment->status, AppointmentStatus::Cancelled->value, $data['reason']);
         $appointment->update(['status' => AppointmentStatus::Cancelled->value]);

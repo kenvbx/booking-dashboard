@@ -61,4 +61,19 @@ class AuthAndRoleTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.name', 'Maya Singh');
     }
+
+    public function test_login_is_rate_limited_per_email_and_ip(): void
+    {
+        foreach (range(1, 5) as $attempt) {
+            $this->postJson('/api/auth/login', [
+                'email' => 'limited@example.test',
+                'password' => 'wrong-password',
+            ])->assertUnauthorized();
+        }
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'limited@example.test',
+            'password' => 'wrong-password',
+        ])->assertStatus(429);
+    }
 }
