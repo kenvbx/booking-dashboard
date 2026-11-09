@@ -44,6 +44,7 @@ The first backend slice is available in `backend/`:
 - Migrations for appointment status history and audit-log foundations.
 - Demo factories and seed data.
 - Transactional appointment creation with server-side overlap validation.
+- Sanctum token authentication with `admin` and `staff` role middleware.
 - PHPUnit feature coverage for appointment creation, conflicts, and customer validation.
 
 Run the backend locally:

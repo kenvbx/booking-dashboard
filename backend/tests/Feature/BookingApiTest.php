@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Service;
 use App\Models\StaffProfile;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,6 +15,7 @@ class BookingApiTest extends TestCase
 
     public function test_appointments_can_be_created_and_listed(): void
     {
+        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
         $customer = Customer::factory()->create();
         $service = Service::factory()->create();
         $staff = StaffProfile::factory()->create();
@@ -33,6 +35,7 @@ class BookingApiTest extends TestCase
 
     public function test_overlapping_appointments_for_the_same_staff_are_rejected(): void
     {
+        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
         $customer = Customer::factory()->create();
         $staff = StaffProfile::factory()->create();
         $payload = [
@@ -51,6 +54,7 @@ class BookingApiTest extends TestCase
 
     public function test_customer_creation_validates_email_uniqueness(): void
     {
+        $this->actingAs(User::factory()->create(['role' => 'admin']), 'sanctum');
         Customer::factory()->create(['email' => 'hello@example.test']);
 
         $this->postJson('/api/customers', ['name' => 'Duplicate', 'email' => 'hello@example.test'])

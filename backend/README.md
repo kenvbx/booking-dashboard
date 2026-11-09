@@ -27,13 +27,21 @@ Seed credentials are demo-only:
 - `GET|POST /api/appointments`
 - `GET|PUT|DELETE /api/{resource}/{id}`
 
+Authentication endpoints:
+
+- `POST /api/auth/login` with `email`, `password`, and optional `device_name`.
+- `GET /api/auth/me` with a `Bearer` token.
+- `POST /api/auth/logout` with a `Bearer` token.
+
+Admin-only resources are customers, services, and staff. Admin and staff can access appointments. Protected routes require a Sanctum bearer token.
+
 Appointment creation validates required relationships, time ordering, timezone, and overlapping bookings for the same staff member inside a database transaction.
 
 ## Verification
 
 ```bash
 vendor/bin/pint --dirty --format agent
-php artisan test --compact tests/Feature/BookingApiTest.php
+php artisan test --compact
 ```
 
 This is a personal/demo project. It does not contain production credentials or client data.
