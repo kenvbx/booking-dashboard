@@ -70,3 +70,12 @@ php artisan serve
 ```
 
 The local test environment uses SQLite. For MySQL, create `booking_dashboard`, copy the MySQL values from `.env.example`, and run the same migrations.
+
+## Continuous integration
+
+GitHub Actions runs on pushes and pull requests to `main`:
+
+- Frontend: `npm ci` and `npm run build`.
+- Backend: PHP 8.3, Composer install, SQLite migrations through the test suite, and all PHPUnit tests.
+
+The workflow is defined in `.github/workflows/ci.yml`.
