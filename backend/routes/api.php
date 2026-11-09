@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\StaffController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     });
 
     Route::middleware('role:admin,staff')->group(function (): void {
+        Route::get('dashboard/metrics', [DashboardController::class, 'metrics']);
         Route::apiResource('appointments', AppointmentController::class);
     });
 });

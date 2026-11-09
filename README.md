@@ -55,6 +55,7 @@ The first backend slice is available in `backend/`:
 - Queue-based confirmation and one-hour reminder email jobs with retry backoff.
 - React login and Sanctum bearer-token flow connected to the Laravel API.
 - API-backed appointment calendar, customer/staff directory, filters, and create flow.
+- API-backed dashboard metrics for bookings, today’s schedule, completion rate, and monthly customers.
 - PHPUnit feature coverage for appointment creation, conflicts, and customer validation.
 
 Run the backend locally:

@@ -200,4 +200,17 @@ class BookingApiTest extends TestCase
             'auditable_id' => $appointment->id,
         ]);
     }
+
+    public function test_staff_can_read_dashboard_metrics(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'staff']), 'sanctum');
+        Appointment::factory()->create(['status' => 'completed']);
+        Customer::factory()->create();
+
+        $this->getJson('/api/dashboard/metrics')
+            ->assertOk()
+            ->assertJsonStructure(['data' => ['total_bookings', 'upcoming_today', 'completion_rate', 'new_customers', 'timezone', 'generated_at']])
+            ->assertJsonPath('data.total_bookings', 1)
+            ->assertJsonPath('data.completion_rate', 100);
+    }
 }

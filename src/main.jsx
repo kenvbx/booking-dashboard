@@ -34,6 +34,7 @@ function App() {
   const [bookings, setBookings] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [services, setServices] = useState([]);
+  const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [staffMembers, setStaffMembers] = useState([]);
   const [status, setStatus] = useState('All status');
   const [staff, setStaff] = useState('All staff');
@@ -51,17 +52,19 @@ function App() {
     setLoading(true);
     setApiError('');
     try {
-      const [appointmentsResponse, customersResponse, staffResponse, servicesResponse] = await Promise.allSettled([
+      const [appointmentsResponse, customersResponse, staffResponse, servicesResponse, metricsResponse] = await Promise.allSettled([
         apiRequest('/appointments?per_page=100', {}, activeToken),
         apiRequest('/customers?per_page=100', {}, activeToken),
         apiRequest('/staff', {}, activeToken),
         apiRequest('/services?per_page=100', {}, activeToken),
+        apiRequest('/dashboard/metrics', {}, activeToken),
       ]);
       if (appointmentsResponse.status === 'rejected') throw appointmentsResponse.reason;
       setBookings((appointmentsResponse.value.data || []).map(normalizeBooking));
       setCustomers(customersResponse.status === 'fulfilled' ? customersResponse.value.data || [] : []);
       setStaffMembers(staffResponse.status === 'fulfilled' ? staffResponse.value.data || [] : []);
       setServices(servicesResponse.status === 'fulfilled' ? servicesResponse.value.data || [] : []);
+      setDashboardMetrics(metricsResponse.status === 'fulfilled' ? metricsResponse.value.data : null);
     } catch (error) {
       if (/unauthenticated/i.test(error.message)) handleLogout(false);
       setApiError(error.message);
@@ -132,10 +135,10 @@ function App() {
   ), [bookings, status, staff]);
   const totalCompleted = bookings.filter((booking) => booking.status === 'Completed').length;
   const metrics = [
-    { icon: <CalendarDays size={18} />, label: 'Total bookings', value: bookings.length, change: 'API live', note: 'current page', tone: 'green' },
-    { icon: <Clock3 size={18} />, label: 'Upcoming today', value: bookings.filter((booking) => booking.status !== 'Cancelled').length, change: 'API live', note: 'active bookings', tone: 'blue' },
-    { icon: <Activity size={18} />, label: 'Completion rate', value: bookings.length ? `${Math.round((totalCompleted / bookings.length) * 1000) / 10}%` : '0%', change: 'API live', note: 'from appointments', tone: 'purple' },
-    { icon: <Users size={18} />, label: 'Customers loaded', value: customers.length, change: 'API live', note: 'directory records', tone: 'orange' },
+    { icon: <CalendarDays size={18} />, label: 'Total bookings', value: dashboardMetrics?.total_bookings ?? bookings.length, change: 'API live', note: 'all records', tone: 'green' },
+    { icon: <Clock3 size={18} />, label: 'Upcoming today', value: dashboardMetrics?.upcoming_today ?? bookings.filter((booking) => booking.status !== 'Cancelled').length, change: 'API live', note: 'active today', tone: 'blue' },
+    { icon: <Activity size={18} />, label: 'Completion rate', value: `${dashboardMetrics?.completion_rate ?? (bookings.length ? Math.round((totalCompleted / bookings.length) * 1000) / 10 : 0)}%`, change: 'API live', note: 'all records', tone: 'purple' },
+    { icon: <Users size={18} />, label: 'New customers', value: dashboardMetrics?.new_customers ?? customers.length, change: 'API live', note: 'this month', tone: 'orange' },
   ];
 
   if (!token) return <LoginScreen onSubmit={handleLogin} loading={loading} error={apiError} />;

@@ -26,6 +26,7 @@ Seed credentials are demo-only:
 - `GET|POST /api/staff`
 - `GET|POST /api/appointments`
 - `GET|PUT|DELETE /api/{resource}/{id}`
+- `GET /api/dashboard/metrics`
 
 Authentication endpoints:
 
