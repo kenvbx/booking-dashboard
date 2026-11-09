@@ -6,3 +6,13 @@ dist/
 .DS_Store
 *.log
 
+# Local Laravel Boost / coding-agent metadata
+backend/.agents/
+backend/.claude/
+backend/.grok/
+backend/.mcp.json
+backend/boost.json
+backend/opencode.json
+backend/AGENTS.md
+backend/CLAUDE.md
+
