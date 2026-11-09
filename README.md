@@ -35,6 +35,26 @@ Then open the Vite URL shown in the terminal.
 - Lucide React
 - CSS with a documented dashboard design system
 
-## Planned backend
+## Backend status
 
-Laravel modular monolith, MySQL, REST API, RBAC, queue-based email, audit logging and transactional overlap prevention. See `PRODUCT_BRIEF.md`, `REQUIREMENTS.md`, and `ARCHITECTURE.md`.
+The first backend slice is available in `backend/`:
+
+- Laravel 13 modular monolith with MySQL-ready configuration.
+- REST API resources for customers, services, staff, and appointments.
+- Migrations for appointment status history and audit-log foundations.
+- Demo factories and seed data.
+- Transactional appointment creation with server-side overlap validation.
+- PHPUnit feature coverage for appointment creation, conflicts, and customer validation.
+
+Run the backend locally:
+
+```bash
+cd backend
+cp .env.example .env
+composer install
+php artisan key:generate
+php artisan migrate --seed
+php artisan serve
+```
+
+The local test environment uses SQLite. For MySQL, create `booking_dashboard`, copy the MySQL values from `.env.example`, and run the same migrations.

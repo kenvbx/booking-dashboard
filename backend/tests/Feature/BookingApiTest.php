@@ -1,0 +1,60 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Customer;
+use App\Models\Service;
+use App\Models\StaffProfile;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class BookingApiTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_appointments_can_be_created_and_listed(): void
+    {
+        $customer = Customer::factory()->create();
+        $service = Service::factory()->create();
+        $staff = StaffProfile::factory()->create();
+
+        $response = $this->postJson('/api/appointments', [
+            'customer_id' => $customer->id,
+            'service_id' => $service->id,
+            'staff_profile_id' => $staff->id,
+            'title' => 'Discovery call',
+            'starts_at' => '2026-11-16T09:00:00+07:00',
+            'ends_at' => '2026-11-16T09:45:00+07:00',
+        ]);
+
+        $response->assertCreated()->assertJsonPath('data.title', 'Discovery call');
+        $this->getJson('/api/appointments')->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    public function test_overlapping_appointments_for_the_same_staff_are_rejected(): void
+    {
+        $customer = Customer::factory()->create();
+        $staff = StaffProfile::factory()->create();
+        $payload = [
+            'customer_id' => $customer->id,
+            'staff_profile_id' => $staff->id,
+            'title' => 'First booking',
+            'starts_at' => '2026-11-16T09:00:00+07:00',
+            'ends_at' => '2026-11-16T10:00:00+07:00',
+        ];
+
+        $this->postJson('/api/appointments', $payload)->assertCreated();
+        $this->postJson('/api/appointments', [...$payload, 'title' => 'Overlapping booking', 'starts_at' => '2026-11-16T09:30:00+07:00'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('starts_at');
+    }
+
+    public function test_customer_creation_validates_email_uniqueness(): void
+    {
+        Customer::factory()->create(['email' => 'hello@example.test']);
+
+        $this->postJson('/api/customers', ['name' => 'Duplicate', 'email' => 'hello@example.test'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('email');
+    }
+}
