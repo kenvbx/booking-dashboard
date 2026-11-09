@@ -11,7 +11,14 @@ npm install
 npm run dev
 ```
 
-Then open the Vite URL shown in the terminal.
+Start the API in another terminal:
+
+```bash
+cd backend
+php artisan serve
+```
+
+Then open the Vite URL shown in the terminal. The Vite dev server proxies `/api` to `http://127.0.0.1:8000`; set `VITE_API_URL` in `.env` when the API is hosted elsewhere.
 
 ## Current demo slice
 
@@ -46,6 +53,8 @@ The first backend slice is available in `backend/`:
 - Transactional appointment creation with server-side overlap validation.
 - Sanctum token authentication with `admin` and `staff` role middleware.
 - Queue-based confirmation and one-hour reminder email jobs with retry backoff.
+- React login and Sanctum bearer-token flow connected to the Laravel API.
+- API-backed appointment calendar, customer/staff directory, filters, and create flow.
 - PHPUnit feature coverage for appointment creation, conflicts, and customer validation.
 
 Run the backend locally:
