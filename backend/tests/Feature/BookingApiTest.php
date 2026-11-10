@@ -38,6 +38,15 @@ class BookingApiTest extends TestCase
         $this->getJson('/api/appointments')->assertOk()->assertJsonCount(1, 'data');
     }
 
+    public function test_appointments_accept_a_bounded_page_size(): void
+    {
+        $this->signInStaff();
+
+        $this->getJson('/api/appointments?per_page=1')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', 1);
+    }
+
     public function test_appointment_on_the_end_date_is_included_in_date_range(): void
     {
         [, $staff] = $this->signInStaff();

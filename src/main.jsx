@@ -26,6 +26,19 @@ async function apiRequest(path, options = {}, token = '') {
   return data;
 }
 
+async function fetchAllAppointments(path, token) {
+  const appointments = [];
+  let page = 1;
+  let lastPage = 1;
+  do {
+    const response = await apiRequest(`${path}&page=${page}&per_page=100`, {}, token);
+    appointments.push(...(response.data || []));
+    lastPage = response.meta?.last_page || page;
+    page += 1;
+  } while (page <= lastPage);
+  return appointments;
+}
+
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem('helio_token') || '');
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('helio_user') || 'null'));
@@ -53,14 +66,14 @@ function App() {
     setApiError('');
     try {
       const [appointmentsResponse, customersResponse, staffResponse, servicesResponse, metricsResponse] = await Promise.allSettled([
-        apiRequest(`/appointments?from=${weekDays[0].iso}&to=${weekDays[6].iso}`, {}, activeToken),
+        fetchAllAppointments(`/appointments?from=${weekDays[0].iso}&to=${weekDays[6].iso}`, activeToken),
         apiRequest('/customers?per_page=100', {}, activeToken),
         apiRequest('/staff', {}, activeToken),
         apiRequest('/services?per_page=100', {}, activeToken),
         apiRequest('/dashboard/metrics', {}, activeToken),
       ]);
       if (appointmentsResponse.status === 'rejected') throw appointmentsResponse.reason;
-      setBookings((appointmentsResponse.value.data || []).map((item) => normalizeBooking(item, weekDays)));
+      setBookings((appointmentsResponse.value || []).map((item) => normalizeBooking(item, weekDays)));
       setCustomers(customersResponse.status === 'fulfilled' ? customersResponse.value.data || [] : []);
       setStaffMembers(staffResponse.status === 'fulfilled' ? staffResponse.value.data || [] : []);
       setServices(servicesResponse.status === 'fulfilled' ? servicesResponse.value.data || [] : []);

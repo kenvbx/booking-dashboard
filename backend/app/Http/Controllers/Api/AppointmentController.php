@@ -37,7 +37,7 @@ class AppointmentController extends Controller
             ->when($request->filled('from'), fn ($query) => $query->where('starts_at', '>=', $request->date('from')))
             ->when($request->filled('to'), fn ($query) => $query->where('ends_at', '<=', Carbon::parse($request->input('to'), config('app.timezone'))->endOfDay()))
             ->orderBy('starts_at')
-            ->paginate(50);
+            ->paginate(min(max($request->integer('per_page', 50), 1), 100));
 
         return AppointmentResource::collection($appointments);
     }
