@@ -99,7 +99,10 @@ class AppointmentController extends Controller
         $database->transaction(function () use ($appointment, $data, $request): void {
             if (isset($data['starts_at']) || isset($data['ends_at']) || isset($data['staff_profile_id'])) {
                 $booking = array_merge($appointment->only(['staff_profile_id', 'starts_at', 'ends_at']), $data);
-                StaffProfile::query()->whereKey($booking['staff_profile_id'])->lockForUpdate()->firstOrFail();
+                $targetStaff = StaffProfile::query()->whereKey($booking['staff_profile_id'])->lockForUpdate()->firstOrFail();
+                if (isset($data['staff_profile_id'])) {
+                    Gate::authorize('reassign', [$appointment, $targetStaff]);
+                }
                 $this->ensureNoConflict($booking, $appointment->id);
             }
             $oldStatus = $appointment->status;

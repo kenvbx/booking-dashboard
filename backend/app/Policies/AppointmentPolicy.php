@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\Appointment;
+use App\Models\StaffProfile;
 use App\Models\User;
 
 class AppointmentPolicy
@@ -25,6 +26,11 @@ class AppointmentPolicy
     public function update(User $user, Appointment $appointment): bool
     {
         return $this->canAccessAppointment($user, $appointment);
+    }
+
+    public function reassign(User $user, Appointment $appointment, StaffProfile $staff): bool
+    {
+        return $user->role === 'admin' || $user->staffProfile?->id === $staff->id;
     }
 
     public function delete(User $user, Appointment $appointment): bool

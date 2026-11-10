@@ -147,6 +147,22 @@ class BookingApiTest extends TestCase
         $this->assertDatabaseHas('appointments', ['id' => $appointment->id, 'status' => 'cancelled']);
     }
 
+    public function test_staff_cannot_reassign_an_appointment_to_another_staff_member(): void
+    {
+        [, $staff] = $this->signInStaff();
+        $otherStaff = StaffProfile::factory()->create();
+        $appointment = Appointment::factory()->create(['staff_profile_id' => $staff->id]);
+
+        $this->patchJson('/api/appointments/'.$appointment->id, [
+            'staff_profile_id' => $otherStaff->id,
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('appointments', [
+            'id' => $appointment->id,
+            'staff_profile_id' => $staff->id,
+        ]);
+    }
+
     public function test_staff_cannot_view_another_staff_members_appointment(): void
     {
         $this->signInStaff();
