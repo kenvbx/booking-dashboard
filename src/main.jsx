@@ -38,6 +38,7 @@ function App() {
   const [status, setStatus] = useState('All status');
   const [staff, setStaff] = useState('All staff');
   const [isModalOpen, setModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(Boolean(token));
@@ -98,7 +99,7 @@ function App() {
     setBookings([]);
   }
 
-  async function addBooking(event) {
+  async function saveBooking(event, existingBooking = null) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const start = `${form.get('date')}T${form.get('time')}:00${APP_TIMEZONE_OFFSET}`;
@@ -106,20 +107,37 @@ function App() {
     endDate.setMinutes(endDate.getMinutes() + 45);
     const end = formatApiDateTime(endDate);
     try {
-      await apiRequest('/appointments', { method: 'POST', body: JSON.stringify({
+      const payload = {
         customer_id: Number(form.get('customer_id')),
         service_id: form.get('service_id') ? Number(form.get('service_id')) : null,
         staff_profile_id: Number(form.get('staff_profile_id')),
         title: form.get('title'),
         starts_at: start,
         ends_at: end,
-        status: 'pending',
         timezone: APP_TIMEZONE,
-        idempotency_key: `web-${crypto.randomUUID()}`,
-      }) }, token);
+      };
+      if (existingBooking) {
+        await apiRequest(`/appointments/${existingBooking.id}`, { method: 'PATCH', body: JSON.stringify(payload) }, token);
+      } else {
+        await apiRequest('/appointments', { method: 'POST', body: JSON.stringify({ ...payload, status: 'pending', idempotency_key: `web-${crypto.randomUUID()}` }) }, token);
+      }
       await loadWorkspace(token);
       setModalOpen(false);
-      showToast('Appointment added to the workspace');
+      setSelectedBooking(null);
+      showToast(existingBooking ? 'Appointment updated' : 'Appointment added to the workspace');
+    } catch (error) {
+      setApiError(error.message);
+    }
+  }
+
+  async function cancelBooking(reason) {
+    if (!selectedBooking) return;
+    try {
+      await apiRequest(`/appointments/${selectedBooking.id}`, { method: 'DELETE', body: JSON.stringify({ reason }) }, token);
+      await loadWorkspace(token);
+      setModalOpen(false);
+      setSelectedBooking(null);
+      showToast('Appointment cancelled');
     } catch (error) {
       setApiError(error.message);
     }
@@ -154,28 +172,33 @@ function App() {
     <main className="main-content"><header className="topbar"><button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><div className="breadcrumbs"><span>Workspace</span><ChevronRight size={14} /><strong>Overview</strong></div><div className="top-actions"><button className="icon-button" aria-label="Search"><Search size={18} /></button><button className="icon-button notification" aria-label="Notifications"><Bell size={18} /><i /></button><div className="top-avatar">{initials(user?.name)}</div></div></header>
       <div className="content-wrap">
         {apiError && <div className="api-error" role="alert"><ShieldCheck size={16} /> {apiError}<button onClick={() => setApiError('')} aria-label="Dismiss error"><X size={15} /></button></div>}
-        <section className="welcome-row"><div><p className="eyebrow">LIVE API WORKSPACE <span className="live-dot" /> {user?.role || 'Staff'} session</p><h1>Good morning, {firstName(user?.name)} <span>✦</span></h1><p className="subtitle">Your booking operations are synced with the Laravel API.</p></div><button className="primary-button" onClick={() => setModalOpen(true)} disabled={loading}><Plus size={18} /> New appointment</button></section>
+        <section className="welcome-row"><div><p className="eyebrow">LIVE API WORKSPACE <span className="live-dot" /> {user?.role || 'Staff'} session</p><h1>Good morning, {firstName(user?.name)} <span>✦</span></h1><p className="subtitle">Your booking operations are synced with the Laravel API.</p></div><button className="primary-button" onClick={() => { setSelectedBooking(null); setModalOpen(true); }} disabled={loading}><Plus size={18} /> New appointment</button></section>
         <section className="metric-grid" aria-label="Booking metrics">{metrics.map((metric) => <Metric key={metric.label} {...metric} />)}</section>
         <section className="main-grid" id="calendar"><div className="calendar-card card"><div className="section-heading"><div><h2>Booking calendar</h2><p>{loading ? 'Loading appointments from API…' : 'See your team’s availability at a glance.'}</p></div><div className="calendar-actions"><button className="outline-button"><CalendarDays size={16} /> This week <ChevronDown size={14} /></button><button className="icon-button subtle" aria-label="More calendar options"><ListFilter size={18} /></button></div></div>
           <div className="filters"><div className="filter-label"><Filter size={15} /> Filters</div><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)}>{STATUS_OPTIONS.map((option) => <option key={option}>{option}</option>)}</select><select aria-label="Filter by staff" value={staff} onChange={(e) => setStaff(e.target.value)}><option>All staff</option>{staffMembers.map((member) => <option key={member.id}>{member.display_name}</option>)}</select><span className="filter-result">{filtered.length} appointments</span></div>
-          <div className="calendar-scroll"><div className="calendar"><div className="time-column"><div className="timezone">GMT+07</div>{times.map((time) => <div className="time" key={time}>{time}</div>)}</div><div className="days-column"><div className="day-heads">{weekDays.slice(0, 7).map((day) => <div className={`day-head ${day.isToday ? 'today' : ''}`} key={day.iso}><span>{day.short}</span><strong>{day.date}</strong></div>)}</div><div className="day-grid">{weekDays.slice(0, 7).map((day) => <div className="day-lane" key={day.iso}>{times.map((time) => <div className="hour-line" key={time} />)}{filtered.filter((booking) => booking.isoDate === day.iso).map((booking) => <BookingCard booking={booking} key={booking.id} />)}</div>)}</div></div></div></div>
+          <div className="calendar-scroll"><div className="calendar"><div className="time-column"><div className="timezone">GMT+07</div>{times.map((time) => <div className="time" key={time}>{time}</div>)}</div><div className="days-column"><div className="day-heads">{weekDays.slice(0, 7).map((day) => <div className={`day-head ${day.isToday ? 'today' : ''}`} key={day.iso}><span>{day.short}</span><strong>{day.date}</strong></div>)}</div><div className="day-grid">{weekDays.slice(0, 7).map((day) => <div className="day-lane" key={day.iso}>{times.map((time) => <div className="hour-line" key={time} />)}{filtered.filter((booking) => booking.isoDate === day.iso).map((booking) => <BookingCard booking={booking} key={booking.id} onClick={() => { setSelectedBooking(booking); setModalOpen(true); }} />)}</div>)}</div></div></div></div>
           <div className="calendar-footer"><span><i className="legend-dot confirmed" /> Confirmed <i className="legend-dot pending" /> Pending <i className="legend-dot cancelled" /> Cancelled</span><span className="updated"><Activity size={13} /> API synced</span></div></div>
-          <aside className="right-rail"><div className="card agenda-card"><div className="section-heading compact"><div><h2>Next up</h2><p>Your closest appointments</p></div><button className="text-button">View all <ChevronRight size={14} /></button></div><div className="agenda-date"><div className="date-square"><strong>{filtered[0]?.day || '—'}</strong><span>UP NEXT</span></div><div><strong>Upcoming agenda</strong><span>{bookings.filter((booking) => booking.status !== 'Cancelled').length} active appointments</span></div></div><div className="agenda-list">{bookings.filter((booking) => booking.status !== 'Cancelled').slice(0, 4).map((booking) => <div className="agenda-item" key={booking.id}><div className="agenda-time">{booking.time}<span>{booking.end}</span></div><div className="agenda-line" /><div className="agenda-details"><strong>{booking.title}</strong><span>{booking.customer} · {booking.staff}</span></div><span className={`status-pill ${booking.status.toLowerCase()}`}>{booking.status}</span></div>)}</div><button className="add-agenda" onClick={() => setModalOpen(true)}><Plus size={16} /> Add appointment</button></div><div className="card insight-card"><div className="insight-icon"><Sparkles size={18} /></div><div><p className="eyebrow">API STATUS</p><h3>Workspace connected</h3><p>Appointments and directories are loading from your Laravel backend.</p><button className="text-button" onClick={() => loadWorkspace(token)}>Refresh data <ChevronRight size={14} /></button></div></div></aside></section>
+          <aside className="right-rail"><div className="card agenda-card"><div className="section-heading compact"><div><h2>Next up</h2><p>Your closest appointments</p></div><button className="text-button">View all <ChevronRight size={14} /></button></div><div className="agenda-date"><div className="date-square"><strong>{filtered[0]?.day || '—'}</strong><span>UP NEXT</span></div><div><strong>Upcoming agenda</strong><span>{bookings.filter((booking) => booking.status !== 'Cancelled').length} active appointments</span></div></div><div className="agenda-list">{bookings.filter((booking) => booking.status !== 'Cancelled').slice(0, 4).map((booking) => <div className="agenda-item" key={booking.id}><div className="agenda-time">{booking.time}<span>{booking.end}</span></div><div className="agenda-line" /><div className="agenda-details"><strong>{booking.title}</strong><span>{booking.customer} · {booking.staff}</span></div><span className={`status-pill ${booking.status.toLowerCase()}`}>{booking.status}</span></div>)}</div><button className="add-agenda" onClick={() => { setSelectedBooking(null); setModalOpen(true); }}><Plus size={16} /> Add appointment</button></div><div className="card insight-card"><div className="insight-icon"><Sparkles size={18} /></div><div><p className="eyebrow">API STATUS</p><h3>Workspace connected</h3><p>Appointments and directories are loading from your Laravel backend.</p><button className="text-button" onClick={() => loadWorkspace(token)}>Refresh data <ChevronRight size={14} /></button></div></div></aside></section>
       </div></main>
     {toast && <div className="toast"><ShieldCheck size={17} /> {toast}</div>}
-    {isModalOpen && <AppointmentModal customers={customers} services={services} staffMembers={staffMembers} onClose={() => setModalOpen(false)} onSubmit={addBooking} />}
+    {isModalOpen && <AppointmentModal booking={selectedBooking} customers={customers} services={services} staffMembers={staffMembers} onClose={() => { setModalOpen(false); setSelectedBooking(null); }} onSubmit={(event) => saveBooking(event, selectedBooking)} onCancel={cancelBooking} />}
   </div>;
 }
 
 function LoginScreen({ onSubmit, loading, error }) { return <div className="login-shell"><div className="login-card"><div className="brand login-brand"><div className="brand-mark"><Sparkles size={16} /></div><span>helio</span></div><p className="eyebrow">BOOKING OPERATIONS</p><h1>Welcome back</h1><p className="subtitle">Sign in to sync your calendar with the Laravel API.</p>{error && <div className="api-error" role="alert"><ShieldCheck size={16} /> {error}</div>}<form onSubmit={onSubmit} className="login-form"><label>Email<input name="email" type="email" defaultValue="admin@helio.test" autoComplete="email" required /></label><label>Password<input name="password" type="password" defaultValue="password" autoComplete="current-password" required /></label><button className="primary-button" type="submit" disabled={loading}>{loading ? 'Connecting…' : 'Sign in to workspace'}</button></form><p className="login-hint">Demo account: admin@helio.test / password</p></div></div>; }
-function AppointmentModal({ customers, services, staffMembers, onClose, onSubmit }) { return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-head"><div><p className="eyebrow">API CREATE</p><h2 id="modal-title">New appointment</h2></div><button className="icon-button subtle" onClick={onClose} aria-label="Close"><X size={18} /></button></div><form onSubmit={onSubmit}><label>Appointment title<input name="title" placeholder="e.g. Discovery call" required /></label><label>Customer<select name="customer_id" required><option value="">Select a customer</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.name}</option>)}</select></label><div className="form-row"><label>Staff<select name="staff_profile_id" required><option value="">Select staff</option>{staffMembers.map((member) => <option value={member.id} key={member.id}>{member.display_name}</option>)}</select></label><label>Service<select name="service_id"><option value="">No service</option>{services.map((service) => <option value={service.id} key={service.id}>{service.name}</option>)}</select></label></div><div className="form-row"><label>Date<input name="date" type="date" defaultValue={tomorrowDate()} required /></label><label>Start time<input name="time" type="time" defaultValue="10:00" required /></label></div><div className="conflict-note"><ShieldCheck size={16} /><span>Helio checks for overlapping bookings in the API transaction.</span></div><div className="modal-actions"><button type="button" className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" type="submit"><Plus size={17} /> Create appointment</button></div></form></div></div>; }
+function AppointmentModal({ booking, customers, services, staffMembers, onClose, onSubmit, onCancel }) {
+  const editing = Boolean(booking);
+  const [reason, setReason] = useState('');
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-head"><div><p className="eyebrow">{editing ? 'API UPDATE' : 'API CREATE'}</p><h2 id="modal-title">{editing ? 'Edit appointment' : 'New appointment'}</h2></div><button className="icon-button subtle" onClick={onClose} aria-label="Close"><X size={18} /></button></div><form onSubmit={onSubmit}><label>Appointment title<input name="title" placeholder="e.g. Discovery call" defaultValue={booking?.title || ''} required /></label><label>Customer<select name="customer_id" defaultValue={booking?.customerId || ''} required><option value="">Select a customer</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.name}</option>)}</select></label><div className="form-row"><label>Staff<select name="staff_profile_id" defaultValue={booking?.staffId || ''} required><option value="">Select staff</option>{staffMembers.map((member) => <option value={member.id} key={member.id}>{member.display_name}</option>)}</select></label><label>Service<select name="service_id" defaultValue={booking?.serviceId || ''}><option value="">No service</option>{services.map((service) => <option value={service.id} key={service.id}>{service.name}</option>)}</select></label></div><div className="form-row"><label>Date<input name="date" type="date" defaultValue={booking?.isoDate || tomorrowDate()} required /></label><label>Start time<input name="time" type="time" defaultValue={booking?.time || '10:00'} required /></label></div>{editing && <label>Cancellation reason (only required when cancelling)<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Customer requested cancellation" /></label>}<div className="conflict-note"><ShieldCheck size={16} /><span>Helio checks for overlapping bookings in the API transaction.</span></div><div className="modal-actions">{editing && <button type="button" className="outline-button danger-button" disabled={!reason.trim()} onClick={() => onCancel(reason.trim())}>Cancel appointment</button>}<button type="button" className="outline-button" onClick={onClose}>Close</button><button className="primary-button" type="submit"><Plus size={17} /> {editing ? 'Save changes' : 'Create appointment'}</button></div></form></div></div>;
+}
+
 function Metric({ icon, label, value, change, note, tone }) { return <div className="metric card"><div className={`metric-icon ${tone}`}>{icon}</div><div className="metric-copy"><span>{label}</span><strong>{value}</strong><small><b className={tone}>{change}</b> {note}</small></div><div className="sparkline"><span /><span /><span /><span /><span /><span /><span /></div></div>; }
-function BookingCard({ booking }) { const top = ((parseInt(booking.time, 10) - 8) * 60 + parseInt(booking.time.slice(3), 10)) / 60 * 62; const height = booking.duration >= 60 ? 62 : 53; return <button className={`booking ${booking.staffColor}`} style={{ top: `${top}px`, height: `${height}px` }} aria-label={`${booking.title} with ${booking.customer}`}><strong>{booking.title}</strong><span>{booking.time} · {booking.customer}</span><i className={`booking-status ${booking.status.toLowerCase()}`} /></button>; }
+function BookingCard({ booking, onClick }) { const top = ((parseInt(booking.time, 10) - 8) * 60 + parseInt(booking.time.slice(3), 10)) / 60 * 62; const height = booking.duration >= 60 ? 62 : 53; return <button className={`booking ${booking.staffColor}`} style={{ top: `${top}px`, height: `${height}px` }} aria-label={`${booking.title} with ${booking.customer}`} onClick={onClick}><strong>{booking.title}</strong><span>{booking.time} · {booking.customer}</span><i className={`booking-status ${booking.status.toLowerCase()}`} /></button>; }
 function normalizeBooking(item, visibleWeek) {
   const start = new Date(item.starts_at);
   const end = new Date(item.ends_at);
   const isoDate = formatDateInTimezone(start);
-  return { id: item.id, isoDate, time: start.toLocaleTimeString([], { timeZone: APP_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false }), end: end.toLocaleTimeString([], { timeZone: APP_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false }), title: item.title, customer: item.customer?.name || 'Customer', staff: item.staff?.display_name || 'Unassigned', staffColor: item.staff?.color || 'blue', status: titleCase(item.status), day: visibleWeek.findIndex((day) => day.iso === isoDate) + 1, duration: Math.max(30, (end - start) / 60000) };
+  return { id: item.id, customerId: item.customer?.id, serviceId: item.service?.id, staffId: item.staff?.id, isoDate, time: start.toLocaleTimeString([], { timeZone: APP_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false }), end: end.toLocaleTimeString([], { timeZone: APP_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false }), title: item.title, customer: item.customer?.name || 'Customer', staff: item.staff?.display_name || 'Unassigned', staffColor: item.staff?.color || 'blue', status: titleCase(item.status), day: visibleWeek.findIndex((day) => day.iso === isoDate) + 1, duration: Math.max(30, (end - start) / 60000) };
 }
 
 function titleCase(value) { return value ? value.charAt(0).toUpperCase() + value.slice(1) : ''; }
