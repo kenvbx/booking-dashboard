@@ -8,7 +8,7 @@ on:
 
 jobs:
   frontend:
-    name: Frontend build
+    name: Frontend build and E2E
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +18,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
 
   backend:
     name: Laravel tests

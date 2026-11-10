@@ -71,6 +71,17 @@ php artisan serve
 
 The local test environment uses SQLite. For MySQL, create `booking_dashboard`, copy the MySQL values from `.env.example`, and run the same migrations.
 
+## End-to-end smoke test
+
+The Playwright smoke test covers the primary browser workflow: sign in, load the workspace, create an appointment, and verify it appears on the calendar.
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+The test uses browser-level API fixtures so it is deterministic and does not require a running Laravel server.
+
 ## Continuous integration
 
 GitHub Actions runs on pushes and pull requests to `main`:
