@@ -102,3 +102,4 @@ Deployment configuration, backup/rollback procedures, and live environment verif
 - [Requirements and backlog](REQUIREMENTS.md)
 - [Architecture and trade-offs](ARCHITECTURE.md)
 - [API setup and contract](backend/README.md)
+- [Deployment guide](DEPLOYMENT.md)
