@@ -9,6 +9,7 @@ import './styles.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const APP_TIMEZONE = 'Asia/Ho_Chi_Minh';
+const APP_TIMEZONE_OFFSET = '+07:00';
 const STATUS_OPTIONS = ['All status', 'Confirmed', 'Pending', 'Cancelled', 'Completed', 'Rescheduled'];
 const times = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 
@@ -100,10 +101,10 @@ function App() {
   async function addBooking(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const start = `${form.get('date')}T${form.get('time')}:00+07:00`;
+    const start = `${form.get('date')}T${form.get('time')}:00${APP_TIMEZONE_OFFSET}`;
     const endDate = new Date(start);
     endDate.setMinutes(endDate.getMinutes() + 45);
-    const end = `${form.get('date')}T${endDate.toTimeString().slice(0, 5)}:00+07:00`;
+    const end = formatApiDateTime(endDate);
     try {
       await apiRequest('/appointments', { method: 'POST', body: JSON.stringify({
         customer_id: Number(form.get('customer_id')),
@@ -113,6 +114,7 @@ function App() {
         starts_at: start,
         ends_at: end,
         status: 'pending',
+        timezone: APP_TIMEZONE,
         idempotency_key: `web-${crypto.randomUUID()}`,
       }) }, token);
       await loadWorkspace(token);
@@ -179,10 +181,20 @@ function normalizeBooking(item, visibleWeek) {
 function titleCase(value) { return value ? value.charAt(0).toUpperCase() + value.slice(1) : ''; }
 function initials(name = 'User') { return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase(); }
 function firstName(name = 'there') { return name.split(' ')[0]; }
-function tomorrowDate() { const date = new Date(); date.setDate(date.getDate() + 1); return date.toISOString().slice(0, 10); }
+function tomorrowDate() {
+  const today = datePartsInTimezone(new Date());
+  const date = new Date(Date.UTC(today.year, today.month - 1, today.day + 1));
+  return date.toISOString().slice(0, 10);
+}
 
 createRoot(document.getElementById('root')).render(<App />);
 
+function formatApiDateTime(value) {
+  const parts = datePartsInTimezone(value);
+  const date = `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+  const time = value.toLocaleTimeString([], { timeZone: APP_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${date}T${time}:00${APP_TIMEZONE_OFFSET}`;
+}
 function getCurrentWeekDays() {
   const today = datePartsInTimezone(new Date());
   const date = new Date(Date.UTC(today.year, today.month - 1, today.day));
