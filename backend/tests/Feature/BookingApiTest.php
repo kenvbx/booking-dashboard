@@ -35,6 +35,7 @@ class BookingApiTest extends TestCase
         ]);
 
         $response->assertCreated()->assertJsonPath('data.title', 'Discovery call');
+        $this->assertDatabaseHas('appointments', ['id' => $response->json('data.id'), 'created_by' => $actor->id]);
         $this->getJson('/api/appointments')->assertOk()->assertJsonCount(1, 'data');
     }
 

@@ -47,6 +47,7 @@ class AppointmentController extends Controller
         $data = $request->validate($this->rules());
         $data['timezone'] ??= config('app.timezone', 'Asia/Ho_Chi_Minh');
         $data['status'] ??= 'pending';
+        $data['created_by'] = $request->user()->id;
         Gate::authorize('create', new Appointment($data));
 
         $appointment = $database->transaction(function () use ($data, $request): Appointment {
