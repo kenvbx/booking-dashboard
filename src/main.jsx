@@ -51,7 +51,7 @@ function App() {
     setApiError('');
     try {
       const [appointmentsResponse, customersResponse, staffResponse, servicesResponse, metricsResponse] = await Promise.allSettled([
-        apiRequest(`/appointments?from=${weekDays[0].iso}&to=${weekDays[7].iso}`, {}, activeToken),
+        apiRequest(`/appointments?from=${weekDays[0].iso}&to=${weekDays[6].iso}`, {}, activeToken),
         apiRequest('/customers?per_page=100', {}, activeToken),
         apiRequest('/staff', {}, activeToken),
         apiRequest('/services?per_page=100', {}, activeToken),

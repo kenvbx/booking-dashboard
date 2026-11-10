@@ -35,7 +35,7 @@ class AppointmentController extends Controller
             ->when($request->filled('staff_profile_id'), fn ($query) => $query->where('staff_profile_id', $request->integer('staff_profile_id')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->when($request->filled('from'), fn ($query) => $query->where('starts_at', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($query) => $query->where('ends_at', '<=', $request->date('to')))
+            ->when($request->filled('to'), fn ($query) => $query->where('ends_at', '<=', Carbon::parse($request->input('to'), config('app.timezone'))->endOfDay()))
             ->orderBy('starts_at')
             ->paginate(50);
 

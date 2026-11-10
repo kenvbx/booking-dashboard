@@ -38,6 +38,21 @@ class BookingApiTest extends TestCase
         $this->getJson('/api/appointments')->assertOk()->assertJsonCount(1, 'data');
     }
 
+    public function test_appointment_on_the_end_date_is_included_in_date_range(): void
+    {
+        [, $staff] = $this->signInStaff();
+        $appointment = Appointment::factory()->create([
+            'staff_profile_id' => $staff->id,
+            'starts_at' => '2026-11-16 16:00:00',
+            'ends_at' => '2026-11-16 16:45:00',
+        ]);
+
+        $this->getJson('/api/appointments?from=2026-11-16&to=2026-11-16')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $appointment->id);
+    }
+
     public function test_overlapping_appointments_for_the_same_staff_are_rejected(): void
     {
         [, $staff] = $this->signInStaff();
