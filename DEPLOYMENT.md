@@ -67,7 +67,7 @@ Create a Pages project connected to the GitHub repository:
 - Build command: `npm run build`.
 - Build output directory: `dist`.
 - Node version: `22`.
-- Environment variable: `VITE_API_URL=https://api.example.com/api`.
+- Environment variables: `VITE_API_URL=https://api.example.com/api` and `VITE_DEMO_MODE=false` (never prefill or advertise demo credentials in production).
 
 The variable is embedded at build time; trigger a new Pages deployment after changing it. The Vite development proxy is not used in Pages. `public/_redirects` keeps client-side routes on `index.html`; `_headers` adds basic browser security headers.
 

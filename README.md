@@ -86,7 +86,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs frontend build and Playwright C
 - Customer/service/staff directory endpoints are admin-only. Staff can access their appointments through the API, but the current frontend cannot populate the creation/edit directories for staff accounts. The mocked browser test does not verify this permission boundary.
 - Frontend edits date/time without changing lifecycle status to `rescheduled`; edit duration is currently fixed at 45 minutes. No lifecycle-status selector is implemented.
 - The calendar is the current week only, with an 08:00–16:00 time grid. It does not yet offer week navigation or robust out-of-hours/overlap layout.
-- Tokens are stored in localStorage. Demo credentials are displayed on login. A public deployment needs an explicit demo-access strategy.
+- Browser bearer tokens are kept in sessionStorage and are cleared when the tab session ends; this is still exposed to XSS, so a future first-party deployment can move to an HttpOnly cookie flow. Demo credentials are only prefilled when `VITE_DEMO_MODE=true`; production uses false.
 - Reminder jobs are scheduled on creation; changing the appointment time does not reschedule an existing queued reminder. Repeated idempotent create requests can dispatch duplicate email jobs.
 - Metrics are workspace-wide, including for staff sessions. Production monitoring, backup/restore, and full-stack deployment checks are pending.
 

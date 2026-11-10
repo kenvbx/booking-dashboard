@@ -4,7 +4,7 @@
 
 React JavaScript/JSX + Vite gọi Laravel 13 REST API qua fetch và Sanctum bearer token. UI dùng Lucide và CSS; chưa chuyển sang TypeScript. MySQL là database mục tiêu, PHPUnit dùng SQLite. Queue database xử lý email. Đây là modular monolith cho personal/demo workspace.
 
-Login trả token và user; frontend lưu localStorage. Calendar gọi appointments theo from/to, duyệt page đến meta.last_page (100 records/request); directory và metrics được fetch song song. Save gọi POST/PATCH; cancel gọi DELETE kèm reason, sau đó reload workspace. Một số directory lỗi được frontend thay bằng mảng rỗng, nên không nên hiểu workspace tải được là mọi endpoint đều thành công.
+Login trả token và user; frontend lưu sessionStorage cho phiên tab. Calendar gọi appointments theo from/to, duyệt page đến meta.last_page (100 records/request); directory và metrics được fetch song song. Save gọi POST/PATCH; cancel gọi DELETE kèm reason, sau đó reload workspace. Một số directory lỗi được frontend thay bằng mảng rỗng, nên không nên hiểu workspace tải được là mọi endpoint đều thành công.
 
 ## Authorization và dữ liệu
 

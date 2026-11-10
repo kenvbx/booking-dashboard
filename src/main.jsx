@@ -10,6 +10,7 @@ import './styles.css';
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const APP_TIMEZONE = 'Asia/Ho_Chi_Minh';
 const APP_TIMEZONE_OFFSET = '+07:00';
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 const STATUS_OPTIONS = ['All status', 'Confirmed', 'Pending', 'Cancelled', 'Completed', 'Rescheduled'];
 const times = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 
@@ -40,8 +41,8 @@ async function fetchAllAppointments(path, token) {
 }
 
 function App() {
-  const [token, setToken] = useState(() => localStorage.getItem('helio_token') || '');
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('helio_user') || 'null'));
+  const [token, setToken] = useState(() => sessionStorage.getItem('helio_token') || '');
+  const [user, setUser] = useState(() => JSON.parse(sessionStorage.getItem('helio_user') || 'null'));
   const [bookings, setBookings] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [services, setServices] = useState([]);
@@ -93,8 +94,8 @@ function App() {
     setApiError('');
     try {
       const response = await apiRequest('/auth/login', { method: 'POST', body: JSON.stringify({ email: form.get('email'), password: form.get('password'), device_name: 'helio-dashboard' }) });
-      localStorage.setItem('helio_token', response.access_token);
-      localStorage.setItem('helio_user', JSON.stringify(response.user));
+      sessionStorage.setItem('helio_token', response.access_token);
+      sessionStorage.setItem('helio_user', JSON.stringify(response.user));
       setUser(response.user);
       setToken(response.access_token);
     } catch (error) {
@@ -105,8 +106,8 @@ function App() {
 
   async function handleLogout(callApi = true) {
     if (callApi && token) await apiRequest('/auth/logout', { method: 'POST' }, token).catch(() => {});
-    localStorage.removeItem('helio_token');
-    localStorage.removeItem('helio_user');
+    sessionStorage.removeItem('helio_token');
+    sessionStorage.removeItem('helio_user');
     setToken('');
     setUser(null);
     setBookings([]);
@@ -198,7 +199,7 @@ function App() {
   </div>;
 }
 
-function LoginScreen({ onSubmit, loading, error }) { return <div className="login-shell"><div className="login-card"><div className="brand login-brand"><div className="brand-mark"><Sparkles size={16} /></div><span>helio</span></div><p className="eyebrow">BOOKING OPERATIONS</p><h1>Welcome back</h1><p className="subtitle">Sign in to sync your calendar with the Laravel API.</p>{error && <div className="api-error" role="alert"><ShieldCheck size={16} /> {error}</div>}<form onSubmit={onSubmit} className="login-form"><label>Email<input name="email" type="email" defaultValue="admin@helio.test" autoComplete="email" required /></label><label>Password<input name="password" type="password" defaultValue="password" autoComplete="current-password" required /></label><button className="primary-button" type="submit" disabled={loading}>{loading ? 'Connecting…' : 'Sign in to workspace'}</button></form><p className="login-hint">Demo account: admin@helio.test / password</p></div></div>; }
+function LoginScreen({ onSubmit, loading, error }) { return <div className="login-shell"><div className="login-card"><div className="brand login-brand"><div className="brand-mark"><Sparkles size={16} /></div><span>helio</span></div><p className="eyebrow">BOOKING OPERATIONS</p><h1>Welcome back</h1><p className="subtitle">Sign in to sync your calendar with the Laravel API.</p>{error && <div className="api-error" role="alert"><ShieldCheck size={16} /> {error}</div>}<form onSubmit={onSubmit} className="login-form"><label>Email<input name="email" type="email" defaultValue={DEMO_MODE ? 'admin@helio.test' : ''} autoComplete="email" required /></label><label>Password<input name="password" type="password" defaultValue={DEMO_MODE ? 'password' : ''} autoComplete="current-password" required /></label><button className="primary-button" type="submit" disabled={loading}>{loading ? 'Connecting…' : 'Sign in to workspace'}</button></form>{DEMO_MODE && <p className="login-hint">Demo account: admin@helio.test / password</p>}</div></div>; }
 function AppointmentModal({ booking, customers, services, staffMembers, onClose, onSubmit, onCancel }) {
   const editing = Boolean(booking);
   const [reason, setReason] = useState('');

@@ -36,6 +36,8 @@ test('staff can sign in and create an appointment from the dashboard', async ({ 
   });
 
   await page.goto('/');
+  await page.getByLabel('Email').fill('admin@helio.test');
+  await page.getByLabel('Password').fill('password');
   await page.getByRole('button', { name: 'Sign in to workspace' }).click();
   await expect(page.getByRole('heading', { name: 'Good morning, Alex' })).toBeVisible();
 
