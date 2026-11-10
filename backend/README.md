@@ -1,56 +1,63 @@
 # Helio Booking Dashboard API
 
-Laravel 13 backend for the Helio personal/demo booking dashboard.
+Laravel 13 + Sanctum API for a personal/demo project. PHP 8.3+, Composer and a relational database are required. MySQL is the deployment target; PHPUnit uses SQLite.
 
 ## Setup
 
+Create the MySQL database `booking_dashboard`, then run from this directory:
+
 ```bash
-cp .env.example .env
 composer install
+cp .env.example .env
+# Configure DB_* in .env.
 php artisan key:generate
 php artisan migrate --seed
 php artisan serve
 ```
 
-The committed `.env.example` is configured for MySQL. The local development `.env` used for this workspace can use SQLite for a zero-setup run.
+APP_TIMEZONE defaults to Asia/Ho_Chi_Minh; FRONTEND_URL defaults to http://localhost:5173. Use the exact frontend origin for CORS. Local SQLite setup is described in the root README.
 
-Seed credentials are demo-only:
+Seed accounts (demo-only): admin@helio.test / password and alex@helio.test / password. Do not use these shared credentials for a private production workspace.
 
-- `admin@helio.test` / `password`
-- `alex@helio.test` / `password`
+## API contract
 
-## API endpoints
+| Endpoint | Methods | Access |
+|---|---|---|
+| /api/auth/login | POST | Public, throttled; email/password, optional device_name |
+| /api/auth/me | GET | Authenticated |
+| /api/auth/logout | POST | Authenticated; revoke current token |
+| /api/customers | GET, POST | Admin |
+| /api/services | GET, POST | Admin |
+| /api/staff | GET, POST | Admin |
+| /api/appointments | GET, POST | Admin/staff, policy scoped |
+| /api/{resource}/{id} | GET, PUT/PATCH, DELETE | Same resource permissions |
+| /api/dashboard/metrics | GET | Admin/staff; currently workspace-wide |
 
-- `GET|POST /api/customers`
-- `GET|POST /api/services`
-- `GET|POST /api/staff`
-- `GET|POST /api/appointments`
-- `GET|PUT|DELETE /api/{resource}/{id}`
-- `GET /api/dashboard/metrics`
+Authenticated requests use Authorization: Bearer <token> and Accept: application/json. Staff deletion deactivates the profile; appointment deletion cancels with a required JSON reason instead of removing the record.
 
-Authentication endpoints:
+Appointment listing supports staff_profile_id, status, from, to, page and per_page (default 50, clamped 1–100). Results are ordered by starts_at. from is a lower start boundary; to includes the end of that calendar day in the application timezone and compares ends_at. Appointments must be contained within the range; cross-boundary overlap querying is not implemented. Read pagination metadata to retrieve every page.
 
-- `POST /api/auth/login` with `email`, `password`, and optional `device_name`.
-- `GET /api/auth/me` with a `Bearer` token.
-- `POST /api/auth/logout` with a `Bearer` token.
+Create requires customer_id, staff_profile_id, title, starts_at and ends_at; service_id is nullable. Supported fields include timezone, status, notes and idempotency_key. created_by is always assigned from the authenticated user. Update accepts partial fields; clients changing times should send starts_at and ends_at together for ordering validation.
 
-Admin-only resources are customers, services, and staff. Admin and staff can access appointments. Protected routes require a Sanctum bearer token.
+Staff can only access their own assigned appointments, including after reassignment checks. Admin can reassign. Current directory endpoints remain admin-only, which limits staff frontend forms.
 
-Security defaults include a five-attempt-per-minute login limiter, a 120-request-per-minute API limiter, explicit frontend CORS origin configuration through `FRONTEND_URL`, and appointment policies that scope staff access to their assigned staff profile.
+Validation and overlap errors return 422 with field errors; unauthenticated requests return 401 and policy failures 403. Login is limited to five requests/minute per email/IP; authenticated API requests to 120/minute per actor.
 
-Appointment creation validates required relationships, time ordering, timezone, and overlapping bookings for the same staff member inside a database transaction.
+## Lifecycle, consistency and audit
 
-Important create, update, deactivate, and cancel actions write an audit record with the actor, resource, action, and minimal metadata in `audit_logs`.
+Transitions: pending → confirmed/cancelled; confirmed → completed/cancelled/rescheduled; rescheduled → pending/confirmed/cancelled. cancelled/completed are terminal. Changing to cancelled/rescheduled requires status_reason on update; DELETE uses reason. History records status transitions and actor.
 
-Appointment status transitions are server-validated: `pending → confirmed/cancelled`, `confirmed → completed/cancelled/rescheduled`, and `rescheduled → pending/confirmed/cancelled`. Cancellation and rescheduling require a reason, and terminal status changes are written to the status history table.
+Create/time/staff updates check overlap in a transaction after locking the staff profile. MySQL concurrency should be verified separately; SQLite tests do not model its row locks. Create retries with the same idempotency_key return the original appointment, but can still enqueue mail again. Audit logs record important resource mutations.
 
-Creating a future appointment queues a confirmation email immediately and a reminder one hour before the start time. Jobs use three attempts with 1/5/15 minute backoff. Run the worker locally with:
+## Email queue
+
+Creation queues confirmation and a reminder delayed until one hour before starts_at. Jobs have three attempts with [60, 300, 900] second backoff. From this directory:
 
 ```bash
-php artisan queue:work --tries=3 --backoff=60,300,900
+php artisan queue:work --tries=3
 ```
 
-The default local mailer writes messages to `storage/logs/laravel.log`; configure SMTP in `.env` when an actual mail transport is needed.
+The default mailer writes to storage/logs/laravel.log. Configure SMTP for delivery and a persistent worker on deployment. Jobs skip cancelled appointments and missing email addresses. Changing appointment times does not reschedule existing delayed jobs. See root REQUIREMENTS.md for follow-up work.
 
 ## Verification
 
@@ -59,4 +66,4 @@ vendor/bin/pint --dirty --format agent
 php artisan test --compact
 ```
 
-This is a personal/demo project. It does not contain production credentials or client data.
+The root Playwright test uses API fixtures, not this server. Latest recorded local PHPUnit result: 22 tests / 88 assertions. Production SMTP, queue recovery, MySQL concurrent writes and full-stack browser workflows still need deployment-level verification.
